@@ -455,7 +455,7 @@ async function createWarningCard() {
   const ctx = canvas.getContext("2d");
 
   const level = latestResult.level || "Trung bình";
-  const productUrl = "https://scamcheck-1-bx17.onrender.com";
+  const productUrl = window.location.origin;
 
   const levelColors = {
     Thấp: "#16a34a",
@@ -543,14 +543,21 @@ async function createWarningCard() {
     3,
   );
 
-  const qrCanvas = document.createElement("canvas");
+  if (typeof QRCode !== "undefined") {
+    const qrCanvas = document.createElement("canvas");
 
-  await QRCode.toCanvas(qrCanvas, productUrl, {
-    width: 210,
-    margin: 1,
-    errorCorrectionLevel: "H",
-  });
+    await QRCode.toCanvas(qrCanvas, productUrl, {
+      width: 210,
+      margin: 1,
+      errorCorrectionLevel: "H",
+    });
 
+    ctx.drawImage(qrCanvas, 95, 1130, 140, 140);
+  } else {
+    ctx.fillStyle = "#dc2626";
+    ctx.font = "bold 24px Arial";
+    ctx.fillText("QR Code chưa tải được", 95, 1200);
+  }
   ctx.fillStyle = "#ffffff";
   canvasRoundRect(ctx, 60, 1100, 960, 190, 28);
 
