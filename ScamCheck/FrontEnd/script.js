@@ -374,6 +374,7 @@ const originalRenderResult = renderResult;
 
 renderResult = function (text, aiResult = null, shouldSaveHistory = true) {
   latestMessage = text;
+  warningCardCreated = false;
 
   latestResult = aiResult || {
     level: classifyMessage(text),
@@ -571,12 +572,16 @@ async function createWarningCard() {
   alert("Đã tạo thẻ cảnh báo. Bạn có thể tải ảnh về máy.");
 }
 
-function downloadWarningCard() {
+async function downloadWarningCard() {
   const canvas = document.getElementById("warningCanvas");
 
-  if (!latestResult || !warningCardCreated) {
-    alert("Bạn hãy phân tích và tạo thẻ cảnh báo trước nhé.");
+  if (!latestResult) {
+    alert("Bạn hãy phân tích tin nhắn trước nhé.");
     return;
+  }
+
+  if (!warningCardCreated) {
+    await createWarningCard();
   }
 
   canvas.toBlob((blob) => {
