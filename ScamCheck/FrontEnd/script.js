@@ -367,3 +367,246 @@ openHistoryBtn.addEventListener("click", () => {
 
 closeHistoryBtn.addEventListener("click", () => showScreen("home"));
 backHomeBtn.addEventListener("click", () => showScreen("home"));
+let latestMessage = "";
+let latestResult = null;
+
+const originalRenderResult = renderResult;
+
+renderResult = function (text, aiResult = null, shouldSaveHistory = true) {
+  latestMessage = text;
+
+  latestResult = aiResult || {
+    level: classifyMessage(text),
+    description: "Kết quả phân tích mẫu.",
+    signs: ["Có nội dung cần kiểm tra kỹ."],
+    suspicious_quote: text.slice(0, 120),
+    actions: [
+      "Không bấm link lạ.",
+      "Không cung cấp OTP hoặc mật khẩu.",
+      "Xác minh qua kênh chính thức.",
+    ],
+  };
+
+  originalRenderResult(text, aiResult, shouldSaveHistory);
+};
+
+function canvasRoundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, width, height, radius);
+  } else {
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+  }
+
+  ctx.closePath();
+  ctx.fill();
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4) {
+  const words = String(text || "").split(" ");
+  let line = "";
+  let lines = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i] + " ";
+    const width = ctx.measureText(testLine).width;
+
+    if (width > maxWidth && i > 0) {
+      ctx.fillText(line.trim(), x, y);
+      line = words[i] + " ";
+      y += lineHeight;
+      lines++;
+
+      if (lines >= maxLines - 1) {
+        ctx.fillText(
+          (line + words.slice(i + 1).join(" ")).trim().slice(0, 90) + "...",
+          x,
+          y,
+        );
+        return y + lineHeight;
+      }
+    } else {
+      line = testLine;
+    }
+  }
+
+  ctx.fillText(line.trim(), x, y);
+  return y + lineHeight;
+}
+let warningCardCreated = false;
+
+async function createWarningCard() {
+  if (!latestResult) {
+    alert("Bạn hãy phân tích một tin nhắn trước khi tạo thẻ cảnh báo nhé.");
+    return;
+  }
+
+  const canvas = document.getElementById("warningCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const level = latestResult.level || "Trung bình";
+  const productUrl = "https://scamcheck-1-bx17.onrender.com";
+
+  const levelColors = {
+    Thấp: "#16a34a",
+    "Trung bình": "#d49b00",
+    Cao: "#f97316",
+    "Nghiêm trọng": "#dc2626",
+  };
+
+  const color = levelColors[level] || "#d49b00";
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#f8fbff";
+  ctx.fillRect(0, 0, 1080, 1350);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(0, 0, 1080, 190);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 58px Arial";
+  ctx.fillText("🛡️ ScamCheck AI", 70, 90);
+
+  ctx.font = "28px Arial";
+  ctx.fillText("Thẻ cảnh báo lừa đảo để chia sẻ cho người thân", 70, 140);
+
+  ctx.fillStyle = "#ffffff";
+  canvasRoundRect(ctx, 60, 240, 960, 220, 28);
+
+  ctx.fillStyle = color;
+  ctx.font = "bold 38px Arial";
+  ctx.fillText("MỨC RỦI RO", 100, 300);
+
+  ctx.font = "bold 66px Arial";
+  ctx.fillText(level.toUpperCase(), 100, 380);
+
+  ctx.fillStyle = "#334155";
+  ctx.font = "30px Arial";
+  wrapText(
+    ctx,
+    latestResult.description || "Cần kiểm tra kỹ trước khi làm theo.",
+    100,
+    430,
+    850,
+    36,
+    2,
+  );
+
+  ctx.fillStyle = "#ffffff";
+  canvasRoundRect(ctx, 60, 500, 960, 300, 28);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 36px Arial";
+  ctx.fillText("DẤU HIỆU CHÍNH", 100, 560);
+
+  ctx.font = "28px Arial";
+  let y = 620;
+
+  const signs = latestResult.signs || ["Có nội dung cần kiểm tra kỹ."];
+
+  signs.slice(0, 4).forEach((sign) => {
+    ctx.fillStyle = color;
+    ctx.fillText("•", 105, y);
+
+    ctx.fillStyle = "#1f2937";
+    y = wrapText(ctx, sign, 135, y, 800, 38, 2);
+    y += 8;
+  });
+
+  ctx.fillStyle = "#ffffff";
+  canvasRoundRect(ctx, 60, 840, 960, 210, 28);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 34px Arial";
+  ctx.fillText("ĐOẠN TRÍCH ĐÁNG NGỜ", 100, 900);
+
+  ctx.fillStyle = "#374151";
+  ctx.font = "28px Arial";
+  wrapText(
+    ctx,
+    `"${latestResult.suspicious_quote || latestMessage.slice(0, 120)}"`,
+    100,
+    955,
+    850,
+    38,
+    3,
+  );
+
+  const qrCanvas = document.createElement("canvas");
+
+  await QRCode.toCanvas(qrCanvas, productUrl, {
+    width: 210,
+    margin: 1,
+    errorCorrectionLevel: "H",
+  });
+
+  ctx.fillStyle = "#ffffff";
+  canvasRoundRect(ctx, 60, 1100, 960, 190, 28);
+
+  ctx.drawImage(qrCanvas, 95, 1130, 140, 140);
+
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 30px Arial";
+  ctx.fillText("Quét mã để truy cập ScamCheck AI", 270, 1160);
+
+  ctx.fillStyle = "#2563eb";
+  ctx.font = "26px Arial";
+  wrapText(ctx, productUrl, 270, 1205, 700, 34, 2);
+
+  ctx.fillStyle = "#6b7280";
+  ctx.font = "24px Arial";
+  ctx.fillText("Chia sẻ để giúp người thân tránh lừa đảo.", 270, 1265);
+
+  warningCardCreated = true;
+  alert("Đã tạo thẻ cảnh báo. Bạn có thể tải ảnh về máy.");
+}
+
+function downloadWarningCard() {
+  const canvas = document.getElementById("warningCanvas");
+
+  if (!latestResult || !warningCardCreated) {
+    alert("Bạn hãy phân tích và tạo thẻ cảnh báo trước nhé.");
+    return;
+  }
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      alert("Không thể tạo ảnh. Bạn hãy thử lại nhé.");
+      return;
+    }
+
+    const imageUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = imageUrl;
+    link.download = "the-canh-bao-scamcheck.png";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(imageUrl);
+  }, "image/png");
+}
+
+const createWarningCardBtn = document.getElementById("createWarningCardBtn");
+const downloadWarningCardBtn = document.getElementById(
+  "downloadWarningCardBtn",
+);
+
+if (createWarningCardBtn) {
+  createWarningCardBtn.addEventListener("click", createWarningCard);
+}
+
+if (downloadWarningCardBtn) {
+  downloadWarningCardBtn.addEventListener("click", downloadWarningCard);
+}
