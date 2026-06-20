@@ -1,624 +1,507 @@
-const samples = {
-  bank: "[VietBank] Tài khoản của quý khách đang bị khóa do giao dịch bất thường. Vui lòng bấm vào link http://vietbank-xacminh.top và nhập OTP để mở lại tài khoản trong 10 phút.",
-  police:
-    "Tôi là cán bộ công an. Anh/chị đang liên quan đến đường dây rửa tiền. Chuyển ngay 20 triệu vào tài khoản này để phục vụ điều tra, nếu không sẽ bị bắt giam.",
-  prize:
-    "Chúc mừng bạn đã trúng thưởng xe SH và 100 triệu đồng. Hãy gửi phí hồ sơ 500.000đ và CCCD để nhận thưởng ngay hôm nay.",
-};
-
-let historyData = JSON.parse(localStorage.getItem("scamcheck_history")) || [];
-
-function saveHistory() {
-  localStorage.setItem("scamcheck_history", JSON.stringify(historyData));
+:root {
+  --blue: #1664d9;
+  --blue-dark: #0d3f8f;
+  --blue-soft: #eaf2ff;
+  --white: #ffffff;
+  --text: #172033;
+  --muted: #667085;
+  --border: #dde7f5;
+  --shadow: 0 18px 45px rgba(18, 52, 99, 0.12);
+  --radius: 28px;
+  --green: #1f9d55;
+  --yellow: #d49b00;
+  --orange: #f97316;
+  --red: #dc2626;
 }
 
-const screens = {
-  home: document.getElementById("homeScreen"),
-  loading: document.getElementById("loadingScreen"),
-  result: document.getElementById("resultScreen"),
-  history: document.getElementById("historyScreen"),
-};
-
-const messageInput = document.getElementById("messageInput");
-const analyzeBtn = document.getElementById("analyzeBtn");
-const openHistoryBtn = document.getElementById("openHistoryBtn");
-const closeHistoryBtn = document.getElementById("closeHistoryBtn");
-const backHomeBtn = document.getElementById("backHomeBtn");
-
-function showScreen(name) {
-  Object.values(screens).forEach((screen) => screen.classList.remove("active"));
-  screens[name].classList.add("active");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+* {
+  box-sizing: border-box;
 }
 
-function showFriendlyError(message) {
-  alert(message);
-  showScreen("home");
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: linear-gradient(135deg, #f5f9ff, #ffffff);
+  color: var(--text);
+  font-size: 18px;
 }
 
-function classifyMessage(text) {
-  const lower = text.toLowerCase();
-  let score = 0;
-
-  if (
-    lower.includes("otp") ||
-    lower.includes("mật khẩu") ||
-    lower.includes("ngân hàng")
-  )
-    score += 3;
-
-  if (
-    lower.includes("chuyển") ||
-    lower.includes("tiền") ||
-    lower.includes("phí")
-  )
-    score += 2;
-
-  if (
-    lower.includes("công an") ||
-    lower.includes("điều tra") ||
-    lower.includes("bắt")
-  )
-    score += 3;
-
-  if (
-    lower.includes("link") ||
-    lower.includes("http") ||
-    lower.includes("bấm vào")
-  )
-    score += 2;
-
-  if (
-    lower.includes("gấp") ||
-    lower.includes("ngay") ||
-    lower.includes("10 phút") ||
-    lower.includes("khóa")
-  )
-    score += 2;
-
-  if (lower.includes("trúng thưởng") || lower.includes("cccd")) score += 2;
-
-  if (score >= 7) return "Nghiêm trọng";
-  if (score >= 5) return "Cao";
-  if (score >= 2) return "Trung bình";
-  return "Thấp";
+.app-shell {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  min-height: calc(100vh - 86px);
 }
 
-function levelClass(level) {
-  return (
-    {
-      Thấp: "low",
-      "Trung bình": "medium",
-      Cao: "high",
-      "Nghiêm trọng": "severe",
-    }[level] || "medium"
-  );
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 34px 0 26px;
+  gap: 20px;
 }
 
-function riskDisplay(level) {
-  if (level === "Thấp") {
-    return {
-      label: "An toàn",
-      percent: "18%",
-    };
-  }
-
-  if (level === "Trung bình") {
-    return {
-      label: "Nghi ngờ",
-      percent: "55%",
-    };
-  }
-
-  return {
-    label: "Nguy hiểm",
-    percent: level === "Cao" ? "82%" : "100%",
-  };
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 
-function renderResult(text, aiResult = null, shouldSaveHistory = true) {
-  const level = aiResult?.level || classifyMessage(text);
-  const type = levelClass(level);
-  const displayRisk = riskDisplay(level);
-  const shouldShowWarningDetails = level !== "Thấp";
+.brand-icon {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  background: var(--blue-soft);
+  border-radius: 24px;
+  font-size: 34px;
+  box-shadow: var(--shadow);
+}
 
-  const riskCard = document.getElementById("riskCard");
-  const riskTitle = document.getElementById("riskTitle");
-  const riskDescription = document.getElementById("riskDescription");
-  const riskBadge = document.getElementById("riskBadge");
-  const riskMeterFill = document.getElementById("riskMeterFill");
+h1,
+h2,
+p {
+  margin: 0;
+}
 
-  riskCard.className = `main-card risk-card risk-${type}`;
-  riskTitle.textContent = displayRisk.label;
-  riskBadge.textContent = displayRisk.label;
+h1 {
+  font-size: 42px;
+  color: var(--blue-dark);
+}
 
-  if (riskMeterFill) {
-    riskMeterFill.style.width = displayRisk.percent;
-  }
+.brand p,
+.main-card p,
+li {
+  line-height: 1.65;
+}
 
-  const descriptions = {
-    Thấp: "Tin nhắn chưa có dấu hiệu nguy hiểm rõ ràng, nhưng vẫn nên kiểm tra nguồn gửi.",
-    "Trung bình":
-      "Tin nhắn có một số điểm đáng ngờ, cần xác minh trước khi làm theo.",
-    Cao: "Tin nhắn có nhiều dấu hiệu lừa đảo và có thể gây mất tiền hoặc lộ thông tin.",
-    "Nghiêm trọng":
-      "Tin nhắn có dấu hiệu lừa đảo rất rõ, tuyệt đối không làm theo yêu cầu.",
-  };
+.brand p,
+.section-label,
+.main-card p {
+  color: var(--muted);
+}
 
-  riskDescription.textContent = aiResult?.description || descriptions[level];
+.screen {
+  display: none;
+}
 
-  const signCard = document.getElementById("signCard");
-  const suspiciousCard = document.getElementById("suspiciousCard");
-  const counselorCard = document.querySelector(".counselor-card");
+.screen.active {
+  display: block;
+}
 
-  if (signCard) {
-    signCard.style.display = shouldShowWarningDetails ? "block" : "none";
-  }
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 0.9fr;
+  gap: 28px;
+}
 
-  if (suspiciousCard) {
-    suspiciousCard.style.display = shouldShowWarningDetails ? "block" : "none";
-  }
+.main-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 30px;
+}
 
-  if (counselorCard) {
-    counselorCard.style.display = shouldShowWarningDetails ? "flex" : "none";
-  }
+.section-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 15px;
+  margin-bottom: 14px;
+}
 
-  if (shouldShowWarningDetails) {
-    const signs = aiResult?.signs || [
-      "Có yếu tố thúc giục hoặc gây áp lực thời gian.",
-      "Có thể yêu cầu thông tin nhạy cảm như OTP, CCCD, tài khoản ngân hàng.",
-      "Nội dung có dấu hiệu giả danh tổ chức hoặc cơ quan chức năng.",
-    ];
+textarea {
+  width: 100%;
+  min-height: 260px;
+  resize: vertical;
+  border: 2px solid var(--border);
+  border-radius: 24px;
+  padding: 22px;
+  font-size: 21px;
+  line-height: 1.55;
+  outline: none;
+}
 
-    document.getElementById("signList").innerHTML = signs
-      .map((item) => `<li>${item}</li>`)
-      .join("");
+textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 5px rgba(22, 100, 217, 0.12);
+}
 
-    const quote =
-      aiResult?.suspicious_quote ||
-      text.slice(0, 180) + (text.length > 180 ? "..." : "");
+button {
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  border-radius: 18px;
+  font-size: 18px;
+}
 
-    document.getElementById("suspiciousQuote").textContent = quote;
+.sample-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0;
+}
 
-    document.getElementById("counselorText").textContent =
-      aiResult?.counselor ||
-      "Con hãy bình tĩnh, đừng bấm vào liên kết và cũng đừng chuyển tiền. Hãy hỏi người thân hoặc gọi tổng đài chính thức để kiểm tra lại nhé.";
-  }
+.sample-buttons button,
+.secondary-btn,
+.history-btn {
+  background: var(--blue-soft);
+  color: var(--blue-dark);
+  padding: 15px 18px;
+}
 
-  const actions = shouldShowWarningDetails
-    ? aiResult?.actions || [
-        "Không bấm vào đường link lạ.",
-        "Không chuyển tiền hoặc cung cấp OTP.",
-        "Gọi số chính thức của ngân hàng/cơ quan để xác minh.",
-      ]
-    : [
-        "Kiểm tra xem người gửi là ai, bạn có quen biết họ không.",
-        "Chưa cần làm gì đặc biệt, nhưng nếu là số lạ, hãy cẩn trọng với các tin nhắn tiếp theo.",
-        "Tuyệt đối không nhập vào đường link hay cung cấp thông tin cá nhân nếu có yêu cầu trong tương lai.",
-      ];
+.primary-btn {
+  width: 100%;
+  background: var(--blue);
+  color: var(--white);
+  padding: 22px;
+  font-size: 23px;
+  box-shadow: 0 12px 24px rgba(22, 100, 217, 0.24);
+}
 
-  document.getElementById("actionList").innerHTML = actions
-    .map(
-      (item, index) =>
-        `<div class="action-item"><strong>${index + 1}.</strong> ${item}</div>`,
-    )
-    .join("");
+.primary-btn:hover,
+.history-btn:hover,
+.secondary-btn:hover,
+.sample-buttons button:hover {
+  transform: translateY(-1px);
+}
 
-  if (shouldSaveHistory) {
-    historyData.unshift({
-      time: new Date().toLocaleString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-      }),
-      level,
-      short: text.slice(0, 58) + (text.length > 58 ? "..." : ""),
-      sample: text,
-      aiResult,
-    });
+.tips-card h2,
+.main-card h2 {
+  font-size: 28px;
+  margin-bottom: 18px;
+}
 
-    historyData = historyData.slice(0, 10);
-    saveHistory();
+.tips-card ul,
+.warning-list {
+  padding-left: 24px;
+}
+
+.loading-card {
+  width: min(560px, 100%);
+  margin: 90px auto;
+  text-align: center;
+  padding: 48px 32px;
+}
+
+.spinner {
+  width: 78px;
+  height: 78px;
+  border: 8px solid var(--blue-soft);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  margin: 0 auto 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-function renderHistory() {
-  const historyList = document.getElementById("historyList");
-
-  if (historyData.length === 0) {
-    historyList.innerHTML = `
-      <div class="empty-history">
-        Chưa có lịch sử phân tích. Hãy nhập một tin nhắn và bấm Phân tích nhé.
-      </div>
-    `;
-    return;
-  }
-
-  historyList.innerHTML = historyData
-    .map((item, index) => {
-      const type = levelClass(item.level);
-      return `
-      <article class="history-item">
-        <strong>${item.time}</strong>
-        <span class="level-pill level-${type}">${item.level}</span>
-        <span>${item.short}</span>
-        <button class="view-btn" data-index="${index}">Xem lại</button>
-      </article>
-    `;
-    })
-    .join("");
-
-  document.querySelectorAll(".view-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const item = historyData[Number(btn.dataset.index)];
-      renderResult(item.sample, item.aiResult || null, false);
-      showScreen("result");
-    });
-  });
+.result-layout {
+  display: grid;
+  gap: 22px;
+  padding-bottom: 30px;
 }
 
-document.querySelectorAll(".sample-buttons button").forEach((button) => {
-  button.addEventListener("click", () => {
-    messageInput.value = samples[button.dataset.sample];
-    messageInput.focus();
-  });
-});
-
-async function analyzeWithAI(text) {
-  try {
-    const response = await fetch("/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    });
-
-    let data;
-
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error(
-        "AI trả về dữ liệu không đúng cấu trúc. Bạn hãy thử lại nhé.",
-      );
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        data.error || "Không thể gọi AI lúc này. Bạn hãy thử lại sau nhé.",
-      );
-    }
-
-    const requiredFields = [
-      "level",
-      "description",
-      "signs",
-      "suspicious_quote",
-      "actions",
-      "counselor",
-    ];
-
-    const validLevels = ["Thấp", "Trung bình", "Cao", "Nghiêm trọng"];
-
-    const isValid =
-      data &&
-      typeof data === "object" &&
-      requiredFields.every((field) => field in data) &&
-      validLevels.includes(data.level) &&
-      Array.isArray(data.signs) &&
-      Array.isArray(data.actions);
-
-    if (!isValid) {
-      throw new Error(
-        "AI trả về dữ liệu chưa đúng cấu trúc. Ứng dụng vẫn hoạt động, bạn hãy thử lại nhé.",
-      );
-    }
-
-    return data;
-  } catch (error) {
-    if (!navigator.onLine) {
-      throw new Error(
-        "Bạn đang mất kết nối mạng. Hãy kiểm tra Wi-Fi/Internet rồi thử lại nhé.",
-      );
-    }
-
-    throw error;
-  }
+.risk-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  border: 2px solid rgba(220, 38, 38, 0.22);
+  border-left: 12px solid var(--red);
+  background: #fff7f7;
 }
 
-analyzeBtn.addEventListener("click", async () => {
-  const text = messageInput.value.trim();
-
-  if (!text) {
-    showFriendlyError(
-      "Bạn chưa nhập tin nhắn. Hãy dán một tin nhắn cần kiểm tra nhé.",
-    );
-    return;
-  }
-
-  if (text.length > 5000) {
-    showFriendlyError(
-      "Tin nhắn quá dài. Bạn hãy rút gọn dưới 5000 ký tự rồi thử lại nhé.",
-    );
-    return;
-  }
-
-  showScreen("loading");
-
-  try {
-    const aiResult = await analyzeWithAI(text);
-    renderResult(text, aiResult, true);
-    showScreen("result");
-  } catch (error) {
-    console.warn(error);
-    alert(
-      error.message ||
-        "Ứng dụng gặp lỗi nhưng vẫn hoạt động. Bạn hãy thử lại nhé.",
-    );
-    renderResult(text, null, true);
-    showScreen("result");
-  }
-});
-
-openHistoryBtn.addEventListener("click", () => {
-  renderHistory();
-  showScreen("history");
-});
-
-closeHistoryBtn.addEventListener("click", () => showScreen("home"));
-backHomeBtn.addEventListener("click", () => showScreen("home"));
-let latestMessage = "";
-let latestResult = null;
-
-const originalRenderResult = renderResult;
-
-renderResult = function (text, aiResult = null, shouldSaveHistory = true) {
-  latestMessage = text;
-  warningCardCreated = false;
-
-  latestResult = aiResult || {
-    level: classifyMessage(text),
-    description: "Kết quả phân tích mẫu.",
-    signs: ["Có nội dung cần kiểm tra kỹ."],
-    suspicious_quote: text.slice(0, 120),
-    actions: [
-      "Không bấm link lạ.",
-      "Không cung cấp OTP hoặc mật khẩu.",
-      "Xác minh qua kênh chính thức.",
-    ],
-  };
-
-  originalRenderResult(text, aiResult, shouldSaveHistory);
-};
-
-function canvasRoundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-
-  if (ctx.roundRect) {
-    ctx.roundRect(x, y, width, height, radius);
-  } else {
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-  }
-
-  ctx.closePath();
-  ctx.fill();
+.risk-content {
+  flex: 1;
+  min-width: 0;
 }
 
-function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4) {
-  const words = String(text || "").split(" ");
-  let line = "";
-  let lines = 0;
-
-  for (let i = 0; i < words.length; i++) {
-    const testLine = line + words[i] + " ";
-    const width = ctx.measureText(testLine).width;
-
-    if (width > maxWidth && i > 0) {
-      ctx.fillText(line.trim(), x, y);
-      line = words[i] + " ";
-      y += lineHeight;
-      lines++;
-
-      if (lines >= maxLines - 1) {
-        ctx.fillText(
-          (line + words.slice(i + 1).join(" ")).trim().slice(0, 90) + "...",
-          x,
-          y,
-        );
-        return y + lineHeight;
-      }
-    } else {
-      line = testLine;
-    }
-  }
-
-  ctx.fillText(line.trim(), x, y);
-  return y + lineHeight;
-}
-let warningCardCreated = false;
-
-async function createWarningCard() {
-  if (!latestResult) {
-    alert("Bạn hãy phân tích một tin nhắn trước khi tạo thẻ cảnh báo nhé.");
-    return;
-  }
-
-  const canvas = document.getElementById("warningCanvas");
-  const ctx = canvas.getContext("2d");
-
-  const level = latestResult.level || "Trung bình";
-  const productUrl = window.location.origin;
-
-  const levelColors = {
-    Thấp: "#16a34a",
-    "Trung bình": "#d49b00",
-    Cao: "#f97316",
-    "Nghiêm trọng": "#dc2626",
-  };
-
-  const color = levelColors[level] || "#d49b00";
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "#f8fbff";
-  ctx.fillRect(0, 0, 1080, 1350);
-
-  ctx.fillStyle = "#0f172a";
-  ctx.fillRect(0, 0, 1080, 190);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 58px Arial";
-  ctx.fillText("🛡️ ScamCheck AI", 70, 90);
-
-  ctx.font = "28px Arial";
-  ctx.fillText("Thẻ cảnh báo lừa đảo để chia sẻ cho người thân", 70, 140);
-
-  ctx.fillStyle = "#ffffff";
-  canvasRoundRect(ctx, 60, 240, 960, 220, 28);
-
-  ctx.fillStyle = color;
-  ctx.font = "bold 38px Arial";
-  ctx.fillText("MỨC RỦI RO", 100, 300);
-
-  ctx.font = "bold 66px Arial";
-  ctx.fillText(level.toUpperCase(), 100, 380);
-
-  ctx.fillStyle = "#334155";
-  ctx.font = "30px Arial";
-  wrapText(
-    ctx,
-    latestResult.description || "Cần kiểm tra kỹ trước khi làm theo.",
-    100,
-    430,
-    850,
-    36,
-    2,
-  );
-
-  ctx.fillStyle = "#ffffff";
-  canvasRoundRect(ctx, 60, 500, 960, 300, 28);
-
-  ctx.fillStyle = "#0f172a";
-  ctx.font = "bold 36px Arial";
-  ctx.fillText("DẤU HIỆU CHÍNH", 100, 560);
-
-  ctx.font = "28px Arial";
-  let y = 620;
-
-  const signs = latestResult.signs || ["Có nội dung cần kiểm tra kỹ."];
-
-  signs.slice(0, 4).forEach((sign) => {
-    ctx.fillStyle = color;
-    ctx.fillText("•", 105, y);
-
-    ctx.fillStyle = "#1f2937";
-    y = wrapText(ctx, sign, 135, y, 800, 38, 2);
-    y += 8;
-  });
-
-  ctx.fillStyle = "#ffffff";
-  canvasRoundRect(ctx, 60, 840, 960, 210, 28);
-
-  ctx.fillStyle = "#0f172a";
-  ctx.font = "bold 34px Arial";
-  ctx.fillText("ĐOẠN TRÍCH ĐÁNG NGỜ", 100, 900);
-
-  ctx.fillStyle = "#374151";
-  ctx.font = "28px Arial";
-  wrapText(
-    ctx,
-    `"${latestResult.suspicious_quote || latestMessage.slice(0, 120)}"`,
-    100,
-    955,
-    850,
-    38,
-    3,
-  );
-
-  if (typeof QRCode !== "undefined") {
-    const qrCanvas = document.createElement("canvas");
-
-    await QRCode.toCanvas(qrCanvas, productUrl, {
-      width: 210,
-      margin: 1,
-      errorCorrectionLevel: "H",
-    });
-
-    ctx.drawImage(qrCanvas, 95, 1130, 140, 140);
-  } else {
-    ctx.fillStyle = "#dc2626";
-    ctx.font = "bold 24px Arial";
-    ctx.fillText("QR Code chưa tải được", 95, 1200);
-  }
-  ctx.fillStyle = "#ffffff";
-  canvasRoundRect(ctx, 60, 1100, 960, 190, 28);
-
-  ctx.drawImage(qrCanvas, 95, 1130, 140, 140);
-
-  ctx.fillStyle = "#0f172a";
-  ctx.font = "bold 30px Arial";
-  ctx.fillText("Quét mã để truy cập ScamCheck AI", 270, 1160);
-
-  ctx.fillStyle = "#2563eb";
-  ctx.font = "26px Arial";
-  wrapText(ctx, productUrl, 270, 1205, 700, 34, 2);
-
-  ctx.fillStyle = "#6b7280";
-  ctx.font = "24px Arial";
-  ctx.fillText("Chia sẻ để giúp người thân tránh lừa đảo.", 270, 1265);
-
-  warningCardCreated = true;
-  alert("Đã tạo thẻ cảnh báo. Bạn có thể tải ảnh về máy.");
+.risk-card h2 {
+  font-size: 40px;
+  margin-bottom: 8px;
 }
 
-async function downloadWarningCard() {
-  const canvas = document.getElementById("warningCanvas");
-
-  if (!latestResult) {
-    alert("Bạn hãy phân tích tin nhắn trước nhé.");
-    return;
-  }
-
-  if (!warningCardCreated) {
-    await createWarningCard();
-  }
-
-  canvas.toBlob((blob) => {
-    if (!blob) {
-      alert("Không thể tạo ảnh. Bạn hãy thử lại nhé.");
-      return;
-    }
-
-    const imageUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = imageUrl;
-    link.download = "the-canh-bao-scamcheck.png";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(imageUrl);
-  }, "image/png");
+.risk-badge {
+  color: var(--white);
+  background: var(--red);
+  padding: 16px 22px;
+  border-radius: 999px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
-const createWarningCardBtn = document.getElementById("createWarningCardBtn");
-const downloadWarningCardBtn = document.getElementById(
-  "downloadWarningCardBtn",
-);
-
-if (createWarningCardBtn) {
-  createWarningCardBtn.addEventListener("click", createWarningCard);
+.risk-meter {
+  width: 100%;
+  height: 18px;
+  background: rgba(23, 32, 51, 0.1);
+  border-radius: 999px;
+  margin-top: 20px;
+  overflow: hidden;
 }
 
-if (downloadWarningCardBtn) {
-  downloadWarningCardBtn.addEventListener("click", downloadWarningCard);
+.risk-meter-fill {
+  width: 0;
+  height: 100%;
+  background: var(--red);
+  border-radius: inherit;
+  transition: width 0.35s ease;
+}
+
+.risk-low {
+  background: #f0fdf4;
+  border-color: rgba(31, 157, 85, 0.24);
+  border-left-color: var(--green);
+}
+.risk-low .risk-badge {
+  background: var(--green);
+}
+.risk-low .risk-meter-fill {
+  background: var(--green);
+}
+.risk-medium {
+  background: #fffbeb;
+  border-color: rgba(212, 155, 0, 0.28);
+  border-left-color: var(--yellow);
+}
+.risk-medium .risk-badge {
+  background: var(--yellow);
+  color: #1f2937;
+}
+.risk-medium .risk-meter-fill {
+  background: var(--yellow);
+}
+.risk-high,
+.risk-severe {
+  background: #fff7f7;
+  border-color: rgba(220, 38, 38, 0.22);
+  border-left-color: var(--red);
+}
+.risk-high .risk-badge,
+.risk-severe .risk-badge {
+  background: var(--red);
+}
+.risk-high .risk-meter-fill,
+.risk-severe .risk-meter-fill {
+  background: var(--red);
+}
+
+.quote-box {
+  background: #fff7cc;
+  border: 2px solid #f4d35e;
+  border-radius: 20px;
+  padding: 20px;
+  color: #5b4300 !important;
+  font-weight: 700;
+}
+
+.action-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.action-item {
+  background: #f8fbff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 18px;
+  line-height: 1.5;
+}
+
+.counselor-card {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.avatar {
+  flex: 0 0 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  background: #ffe8f1;
+  font-size: 36px;
+}
+
+.secondary-btn.small {
+  padding: 12px 16px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.history-list {
+  display: grid;
+  gap: 14px;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 160px 130px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: #fbfdff;
+}
+
+.level-pill {
+  display: inline-block;
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.level-low {
+  background: var(--green);
+}
+.level-medium {
+  background: var(--yellow);
+}
+.level-high {
+  background: var(--orange);
+}
+.level-severe {
+  background: var(--red);
+}
+
+.view-btn {
+  background: var(--blue);
+  color: white;
+  padding: 12px 16px;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 24px 20px 34px;
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 17px;
+  }
+  .app-shell {
+    width: min(390px, calc(100% - 24px));
+  }
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-top: 22px;
+  }
+  .brand-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 30px;
+  }
+  h1 {
+    font-size: 34px;
+  }
+  .brand {
+    align-items: flex-start;
+  }
+  .history-btn {
+    width: 100%;
+  }
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .main-card {
+    padding: 22px;
+    border-radius: 24px;
+  }
+  textarea {
+    min-height: 220px;
+    font-size: 19px;
+  }
+  .sample-buttons {
+    flex-direction: column;
+  }
+  .sample-buttons button {
+    width: 100%;
+    padding: 17px;
+  }
+  .primary-btn {
+    padding: 20px;
+    font-size: 21px;
+  }
+  .risk-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .risk-card h2 {
+    font-size: 34px;
+  }
+  .action-list {
+    grid-template-columns: 1fr;
+  }
+  .counselor-card {
+    flex-direction: column;
+  }
+  .history-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .history-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .view-btn {
+    width: 100%;
+  }
+}
+.warning-card-section {
+  margin-top: 0;
+}
+
+.warning-card-section p {
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+
+#warningCanvas {
+  width: 100%;
+  max-width: 430px;
+  display: block;
+  margin: 0 auto;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(18, 52, 99, 0.1);
+}
+
+.card-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.card-actions button {
+  flex: 1;
+}
+
+@media (max-width: 760px) {
+  .card-actions {
+    flex-direction: column;
+  }
+
+  #warningCanvas {
+    max-width: 100%;
+  }
 }
